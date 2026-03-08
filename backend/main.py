@@ -3,11 +3,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List
+from datetime import datetime, timedelta
 import anthropic
 import os
+import httpx
+import yfinance as yf
+import finnhub
 from dotenv import load_dotenv
 
+
 load_dotenv()
+
+finnhub_client = finnhub.Client(api_key=os.getenv("FINNHUB_API_KEY"))
 
 app = FastAPI()
 
@@ -81,7 +88,55 @@ async def chat(request: ChatRequest):
 async def health():
     return {"status": "ok"}
 
-import yfinance as yf
+@app.get("/stock/search")
+async def search_stocks(q: str):
+    async with httpx.AsyncClient() as http:
+        res = await http.get(
+            "https://query2.finance.yahoo.com/v1/finance/search",
+            params={"q": q, "quotesCount": 8, "newsCount": 0},
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+        data = res.json()
+
+    results = []
+    for r in data.get("quotes", []):
+        if r.get("quoteType") == "EQUITY" and "." not in r.get("symbol", ""):
+            results.append({
+                "ticker": r["symbol"],
+                "company": r.get("longname") or r.get("shortname", "")
+            })
+
+    return results[:8]
+
+@app.get("/stock/{ticker}/current-price")
+async def current_price(ticker: str):
+    stock = yf.Ticker(ticker)
+    hist = stock.history(period="1d", interval="1m")
+    if hist.empty:
+        hist = stock.history(period="2d", interval="1d")
+    if hist.empty:
+        return {"error": "No data"}
+    price = round(float(hist["Close"].iloc[-1]), 2)
+    return {"ticker": ticker, "price": price}
+
+@app.get("/stock/{ticker}/price-on-date")
+async def price_on_date(ticker: str, date: str):
+    stock = yf.Ticker(ticker)
+    hist = stock.history(start=date, end=date, interval="1d")
+
+    if hist.empty:
+        d = datetime.strptime(date, "%Y-%m-%d")
+        hist = stock.history(
+            start=(d - timedelta(days=5)).strftime("%Y-%m-%d"),
+            end=(d + timedelta(days=1)).strftime("%Y-%m-%d"),
+            interval="1d"
+        )
+
+    if hist.empty:
+        return {"error": "No price data"}
+
+    price = round(float(hist["Close"].iloc[-1]), 2)
+    return {"ticker": ticker, "date": date, "price": price}
 
 @app.get("/stock/{ticker}/history")
 async def stock_history(ticker: str, timeframe: str = "1m"):
@@ -93,16 +148,16 @@ async def stock_history(ticker: str, timeframe: str = "1m"):
         "1y": ("1y", "1wk"),
     }
     period, interval = timeframe_map.get(timeframe, ("1mo", "1d"))
-    
+
     stock = yf.Ticker(ticker)
     hist = stock.history(period=period, interval=interval)
-    
+
     if hist.empty:
         return {"error": "No data"}
-    
+
     data = [
         {"t": int(row.Index.timestamp()), "c": round(row.Close, 2)}
         for row in hist.itertuples()
     ]
-    
+
     return {"ticker": ticker, "timeframe": timeframe, "data": data}

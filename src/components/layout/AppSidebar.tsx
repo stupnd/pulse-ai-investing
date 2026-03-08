@@ -16,7 +16,7 @@ export function AppSidebar() {
         <div className="w-8 h-8 rounded-lg bg-sidebar-accent flex items-center justify-center">
           <TrendingUp className="w-4 h-4 text-sidebar-primary" />
         </div>
-        <span className="text-lg font-semibold text-sidebar-primary tracking-tight">Pulse</span>
+        <span className="text-lg font-semibold text-sidebar-primary tracking-tight">Sage</span>
       </div>
 
       {/* Nav */}
@@ -43,7 +43,7 @@ export function AppSidebar() {
 
       {/* Footer */}
       <div className="px-2 py-3 border-t border-sidebar-border">
-        <p className="text-xs text-sidebar-muted">Pulse v1.0</p>
+        <p className="text-xs text-sidebar-muted">Sage v1.0</p>
       </div>
     </aside>
   );

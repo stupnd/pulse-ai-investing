@@ -1,52 +1,121 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
 
 interface Holding {
   id: string;
   ticker: string;
   company: string;
   shares: number;
-  avgCost: number;
-  currentPrice: number;
-  sector: string;
+  avg_cost: number;
+  current_price: number;
 }
 
-const initialHoldings: Holding[] = [
-  { id: "1", ticker: "AAPL", company: "Apple Inc.", shares: 50, avgCost: 145.0, currentPrice: 178.72, sector: "Technology" },
-  { id: "2", ticker: "NVDA", company: "NVIDIA Corp.", shares: 30, avgCost: 220.0, currentPrice: 485.09, sector: "Technology" },
-  { id: "3", ticker: "MSFT", company: "Microsoft Corp.", shares: 25, avgCost: 280.0, currentPrice: 378.91, sector: "Technology" },
-  { id: "4", ticker: "TSLA", company: "Tesla Inc.", shares: 15, avgCost: 250.0, currentPrice: 237.49, sector: "Auto" },
-  { id: "5", ticker: "JNJ", company: "Johnson & Johnson", shares: 40, avgCost: 160.0, currentPrice: 156.74, sector: "Healthcare" },
-  { id: "6", ticker: "JPM", company: "JPMorgan Chase", shares: 20, avgCost: 135.0, currentPrice: 172.38, sector: "Finance" },
-];
+interface SearchResult {
+  ticker: string;
+  company: string;
+}
 
 export default function Holdings() {
-  const [holdings, setHoldings] = useState<Holding[]>(initialHoldings);
+  const [holdings, setHoldings] = useState<Holding[]>([]);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ ticker: "", company: "", shares: "", avgCost: "" });
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({
+    ticker: "",
+    company: "",
+    shares: "",
+    avg_cost: "",
+    date: "",
+  });
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [fetchingPrice, setFetchingPrice] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
 
-  const addHolding = () => {
-    if (!form.ticker || !form.shares || !form.avgCost) return;
-    const newHolding: Holding = {
-      id: Date.now().toString(),
-      ticker: form.ticker.toUpperCase(),
-      company: form.company || form.ticker.toUpperCase(),
-      shares: Number(form.shares),
-      avgCost: Number(form.avgCost),
-      currentPrice: Number(form.avgCost) * (0.9 + Math.random() * 0.3),
-      sector: "Other",
-    };
-    setHoldings([...holdings, newHolding]);
-    setForm({ ticker: "", company: "", shares: "", avgCost: "" });
-    setOpen(false);
+  useEffect(() => { fetchHoldings(); }, []);
+
+  const fetchHoldings = async () => {
+    const { data, error } = await supabase
+      .from("holdings")
+      .select("*")
+      .order("created_at", { ascending: true });
+    if (!error && data) setHoldings(data);
+    setLoading(false);
   };
 
-  const removeHolding = (id: string) => setHoldings(holdings.filter((h) => h.id !== id));
+  const handleTickerSearch = async (val: string) => {
+    setForm({ ...form, ticker: val, company: "" });
+    if (val.length < 1) { setSearchResults([]); return; }
+    setSearching(true);
+    try {
+      const res = await fetch(`http://localhost:8000/stock/search?q=${val}`);
+      const data = await res.json();
+      setSearchResults(data);
+    } catch { setSearchResults([]); }
+    setSearching(false);
+  };
+
+  const selectTicker = (result: SearchResult) => {
+    setForm({ ...form, ticker: result.ticker, company: result.company });
+    setSearchResults([]);
+  };
+
+  const handleDateChange = async (date: string) => {
+    setForm({ ...form, date, avg_cost: "" });
+    if (!form.ticker || !date) return;
+    setFetchingPrice(true);
+    try {
+      const res = await fetch(`http://localhost:8000/stock/${form.ticker}/price-on-date?date=${date}`);
+      const data = await res.json();
+      if (data.price) setForm((prev) => ({ ...prev, date, avg_cost: data.price.toString() }));
+    } catch {}
+    setFetchingPrice(false);
+  };
+
+  const addHolding = async () => {
+    if (!form.ticker || !form.shares || !form.avg_cost) return;
+
+    let currentPrice = Number(form.avg_cost);
+    try {
+      const res = await fetch(`http://localhost:8000/stock/${form.ticker}/current-price`);
+      const data = await res.json();
+      if (data.price) currentPrice = data.price;
+    } catch {}
+
+    const { data, error } = await supabase
+      .from("holdings")
+      .insert({
+        ticker: form.ticker.toUpperCase(),
+        company: form.company || form.ticker.toUpperCase(),
+        shares: Number(form.shares),
+        avg_cost: Number(form.avg_cost),
+        current_price: currentPrice,
+      })
+      .select()
+      .single();
+    if (!error && data) {
+      setHoldings([...holdings, data]);
+      setForm({ ticker: "", company: "", shares: "", avg_cost: "", date: "" });
+      setOpen(false);
+    }
+  };
+
+  const removeHolding = async (id: string) => {
+    await supabase.from("holdings").delete().eq("id", id);
+    setHoldings(holdings.filter((h) => h.id !== id));
+  };
+
+  if (loading) return <div className="p-8 text-sm text-muted-foreground">Loading holdings...</div>;
 
   return (
     <div className="p-8 max-w-[1200px]">
@@ -55,36 +124,85 @@ export default function Holdings() {
           <h1 className="text-2xl font-bold tracking-tight">Holdings</h1>
           <p className="text-sm text-muted-foreground mt-1">Manage your portfolio positions</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(v) => { setOpen(v); setSearchResults([]); }}>
           <DialogTrigger asChild>
-            <Button size="sm" className="gap-1.5">
-              <Plus className="w-4 h-4" /> Add Holding
-            </Button>
+            <Button size="sm" className="gap-1.5"><Plus className="w-4 h-4" /> Add Holding</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Add New Holding</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-2">
-              <div className="grid gap-1.5">
+
+              {/* Ticker search */}
+              <div className="grid gap-1.5 relative" ref={searchRef}>
                 <Label>Ticker</Label>
-                <Input placeholder="AAPL" value={form.ticker} onChange={(e) => setForm({ ...form, ticker: e.target.value })} />
+                <Input
+                  placeholder="Search AAPL, NVDA..."
+                  value={form.ticker}
+                  onChange={(e) => handleTickerSearch(e.target.value)}
+                  autoComplete="off"
+                />
+                {form.company && (
+                  <p className="text-xs text-muted-foreground">{form.company}</p>
+                )}
+                {searchResults.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-card border rounded-lg shadow-lg overflow-hidden">
+                    {searching && (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">Searching...</div>
+                    )}
+                    {searchResults.map((r) => (
+                      <button
+                        key={r.ticker}
+                        onClick={() => selectTicker(r)}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors flex items-center gap-2"
+                      >
+                        <span className="font-semibold">{r.ticker}</span>
+                        <span className="text-muted-foreground text-xs truncate">{r.company}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
+
+              {/* Date picker */}
               <div className="grid gap-1.5">
-                <Label>Company Name</Label>
-                <Input placeholder="Apple Inc." value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} />
+                <Label>Purchase Date</Label>
+                <Input
+                  type="date"
+                  value={form.date}
+                  max={new Date().toISOString().split("T")[0]}
+                  onChange={(e) => handleDateChange(e.target.value)}
+                />
               </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="grid gap-1.5">
                   <Label>Shares</Label>
-                  <Input type="number" placeholder="10" value={form.shares} onChange={(e) => setForm({ ...form, shares: e.target.value })} />
+                  <Input
+                    type="number"
+                    placeholder="10"
+                    value={form.shares}
+                    onChange={(e) => setForm({ ...form, shares: e.target.value })}
+                  />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label>Avg Cost ($)</Label>
-                  <Input type="number" placeholder="150.00" value={form.avgCost} onChange={(e) => setForm({ ...form, avgCost: e.target.value })} />
+                  <Label>
+                    Avg Cost ($)
+                    {fetchingPrice && <span className="text-xs text-muted-foreground ml-1">fetching...</span>}
+                  </Label>
+                  <Input
+                    type="number"
+                    placeholder="150.00"
+                    value={form.avg_cost}
+                    onChange={(e) => setForm({ ...form, avg_cost: e.target.value })}
+                  />
                 </div>
               </div>
-              <Button onClick={addHolding}>Add to Portfolio</Button>
+
+              <Button onClick={addHolding} disabled={!form.ticker || !form.shares || !form.avg_cost}>
+                Add to Portfolio
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -107,29 +225,37 @@ export default function Holdings() {
               </tr>
             </thead>
             <tbody>
-              {holdings.map((h) => {
-                const totalValue = h.shares * h.currentPrice;
-                const totalCost = h.shares * h.avgCost;
-                const gainLoss = ((totalValue - totalCost) / totalCost) * 100;
-                return (
-                  <tr key={h.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
-                    <td className="px-5 py-3.5 font-semibold">{h.ticker}</td>
-                    <td className="px-5 py-3.5 text-muted-foreground">{h.company}</td>
-                    <td className="px-5 py-3.5 text-right">{h.shares}</td>
-                    <td className="px-5 py-3.5 text-right">${h.avgCost.toFixed(2)}</td>
-                    <td className="px-5 py-3.5 text-right">${h.currentPrice.toFixed(2)}</td>
-                    <td className="px-5 py-3.5 text-right font-medium">${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    <td className={cn("px-5 py-3.5 text-right font-semibold", gainLoss >= 0 ? "text-gain" : "text-loss")}>
-                      {gainLoss >= 0 ? "+" : ""}{gainLoss.toFixed(2)}%
-                    </td>
-                    <td className="px-2 py-3.5">
-                      <button onClick={() => removeHolding(h.id)} className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+              {holdings.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-5 py-8 text-center text-muted-foreground text-sm">
+                    No holdings yet. Add your first position.
+                  </td>
+                </tr>
+              ) : (
+                holdings.map((h) => {
+                  const totalValue = h.shares * h.current_price;
+                  const totalCost = h.shares * h.avg_cost;
+                  const gainLoss = ((totalValue - totalCost) / totalCost) * 100;
+                  return (
+                    <tr key={h.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
+                      <td className="px-5 py-3.5 font-semibold">{h.ticker}</td>
+                      <td className="px-5 py-3.5 text-muted-foreground">{h.company}</td>
+                      <td className="px-5 py-3.5 text-right">{h.shares}</td>
+                      <td className="px-5 py-3.5 text-right">${h.avg_cost.toFixed(2)}</td>
+                      <td className="px-5 py-3.5 text-right">${h.current_price.toFixed(2)}</td>
+                      <td className="px-5 py-3.5 text-right font-medium">${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className={cn("px-5 py-3.5 text-right font-semibold", gainLoss >= 0 ? "text-green-500" : "text-red-500")}>
+                        {gainLoss >= 0 ? "+" : ""}{gainLoss.toFixed(2)}%
+                      </td>
+                      <td className="px-2 py-3.5">
+                        <button onClick={() => removeHolding(h.id)} className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
