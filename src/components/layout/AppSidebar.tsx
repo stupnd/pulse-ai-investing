@@ -1,13 +1,14 @@
 
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Briefcase, MessageSquare, TrendingUp, Newspaper } from "lucide-react";
+import { LayoutDashboard, Briefcase, MessageSquare, TrendingUp, Newspaper, Bookmark } from "lucide-react";
 
 const navItems = [
   { title: "Dashboard", path: "/", icon: LayoutDashboard },
   { title: "Holdings", path: "/holdings", icon: Briefcase },
   { title: "News", path: "/news", icon: Newspaper },
   { title: "Chat", path: "/chat", icon: MessageSquare },
+  { title: "Watchlist", path: "/watchlist", icon: Bookmark },
 ];
 
 export function AppSidebar() {

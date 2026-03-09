@@ -220,3 +220,32 @@ async def get_portfolio_news(tickers: str):
             result[ticker.strip()] = []
     
     return result
+
+@app.get("/stock/{ticker}/quote")
+async def get_quote(ticker: str):
+    stock = yf.Ticker(ticker)
+    info = stock.info
+    hist = stock.history(period="2d", interval="1d")
+    
+    if hist.empty:
+        return {"error": "No data"}
+    
+    current = round(float(hist["Close"].iloc[-1]), 2)
+    prev = round(float(hist["Close"].iloc[-2]), 2) if len(hist) > 1 else current
+    change = round(current - prev, 2)
+    change_pct = round((change / prev) * 100, 2)
+    
+    # sparkline - last 7 days
+    spark = stock.history(period="7d", interval="1d")
+    sparkline = [round(float(p), 2) for p in spark["Close"].tolist()]
+    
+    return {
+        "ticker": ticker,
+        "company": info.get("longName", ticker),
+        "price": current,
+        "change": change,
+        "change_pct": change_pct,
+        "sparkline": sparkline,
+        "market_cap": info.get("marketCap", 0),
+        "volume": info.get("volume", 0),
+    }

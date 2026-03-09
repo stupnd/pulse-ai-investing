@@ -9,6 +9,8 @@ import Holdings from "./pages/Holdings";
 import Chat from "./pages/Chat";
 import NotFound from "./pages/NotFound";
 import News from "./pages/News";
+import Watchlist from "./pages/Watchlist";
+
 
 const queryClient = new QueryClient();
 
@@ -24,6 +26,7 @@ const App = () => (
             <Route path="/holdings" element={<Holdings />} />
             <Route path="/chat" element={<Chat />} />
             <Route path="/news" element={<News />} />
+            <Route path="/watchlist" element={<Watchlist />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
