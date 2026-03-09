@@ -46,14 +46,14 @@ export default function StockDetail() {
   }, [ticker, timeframe]);
 
   const fetchDetail = async () => {
-    const res = await fetch(`http://localhost:8000/stock/${ticker}/detail`);
+    const res = await fetch(`https://pulse-ai-investing.onrender.com/stock/${ticker}/detail`);
     const data = await res.json();
     setDetail(data);
   };
 
   const fetchChart = async () => {
     setLoadingChart(true);
-    const res = await fetch(`http://localhost:8000/stock/${ticker}/history?timeframe=${timeframe}`);
+    const res = await fetch(`https://pulse-ai-investing.onrender.com/stock/${ticker}/history?timeframe=${timeframe}`);
     const data = await res.json();
     setChartData(data.data || []);
     setLoadingChart(false);

@@ -33,7 +33,7 @@ export default function News() {
     const { data } = await supabase.from("holdings").select("ticker").eq("user_id", userId);
     if (!data || data.length === 0) { setLoading(false); return; }
     const tickers = data.map((h) => h.ticker).join(",");
-    const res = await fetch(`http://localhost:8000/news?tickers=${tickers}`);
+    const res = await fetch(`https://pulse-ai-investing.onrender.com/news?tickers=${tickers}`);
     const result = await res.json();
     setNews(result);
     setActiveTicker(Object.keys(result)[0] || null);

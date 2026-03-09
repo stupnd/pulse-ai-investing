@@ -25,7 +25,7 @@ function InlineChart({ ticker, timeframe }: { ticker: string; timeframe: string 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`http://localhost:8000/stock/${ticker}/history?timeframe=${timeframe}`)
+    fetch(`https://pulse-ai-investing.onrender.com/stock/${ticker}/history?timeframe=${timeframe}`)
       .then((r) => r.json())
       .then((d) => { setData(d.data || []); setLoading(false); })
       .catch(() => setLoading(false));
@@ -117,7 +117,7 @@ export default function Chat() {
     setMessages((prev) => [...prev, { id: assistantId, role: "assistant", content: "" }]);
 
     try {
-      const res = await fetch("http://localhost:8000/chat", {
+      const res = await fetch("https://pulse-ai-investing.onrender.com/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: userMsg.content, holdings: HOLDINGS, chat_history: history }),

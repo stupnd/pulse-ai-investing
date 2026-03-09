@@ -49,7 +49,7 @@ export default function Watchlist() {
   const fetchQuote = async (ticker: string) => {
     setLoadingQuotes((prev) => ({ ...prev, [ticker]: true }));
     try {
-      const res = await fetch(`http://localhost:8000/stock/${ticker}/quote`);
+      const res = await fetch(`https://pulse-ai-investing.onrender.com/stock/${ticker}/quote`);
       const data = await res.json();
       if (!data.error) setQuotes((prev) => ({ ...prev, [ticker]: data }));
     } catch {}
@@ -60,7 +60,7 @@ export default function Watchlist() {
     setQuery(val);
     if (val.length < 1) { setSearchResults([]); return; }
     try {
-      const res = await fetch(`http://localhost:8000/stock/search?q=${val}`);
+      const res = await fetch(`https://pulse-ai-investing.onrender.com/stock/search?q=${val}`);
       const data = await res.json();
       setSearchResults(data);
     } catch {}

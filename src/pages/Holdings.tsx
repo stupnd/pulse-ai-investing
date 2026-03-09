@@ -57,7 +57,7 @@ export default function Holdings() {
     if (val.length < 1) { setSearchResults([]); return; }
     setSearching(true);
     try {
-      const res = await fetch(`http://localhost:8000/stock/search?q=${val}`);
+      const res = await fetch(`https://pulse-ai-investing.onrender.com/stock/search?q=${val}`);
       const data = await res.json();
       setSearchResults(data);
     } catch { setSearchResults([]); }
@@ -74,7 +74,7 @@ export default function Holdings() {
     if (!form.ticker || !date) return;
     setFetchingPrice(true);
     try {
-      const res = await fetch(`http://localhost:8000/stock/${form.ticker}/price-on-date?date=${date}`);
+      const res = await fetch(`https://pulse-ai-investing.onrender.com/stock/${form.ticker}/price-on-date?date=${date}`);
       const data = await res.json();
       if (data.price) setForm((prev) => ({ ...prev, date, avg_cost: data.price.toString() }));
     } catch {}
@@ -86,7 +86,7 @@ export default function Holdings() {
 
     let currentPrice = Number(form.avg_cost);
     try {
-      const res = await fetch(`http://localhost:8000/stock/${form.ticker}/current-price`);
+      const res = await fetch(`https://pulse-ai-investing.onrender.com/stock/${form.ticker}/current-price`);
       const data = await res.json();
       if (data.price) currentPrice = data.price;
     } catch {}
