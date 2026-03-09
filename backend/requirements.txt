@@ -3,9 +3,9 @@ uvicorn
 anthropic
 langchain
 langchain-anthropic
-langchain-pinecone
-pinecone-client
 finnhub-python
 supabase
 python-dotenv
 pydantic
+yfinance
+httpx
