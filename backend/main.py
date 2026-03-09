@@ -83,7 +83,7 @@ async def stream_response(request: ChatRequest):
                 )
                 if news:
                     news_context += f"\nRecent news for {ticker}:\n"
-                    for article in news[:4]:
+                    for article in news[:10]:
                         news_context += f"- [{article['headline']}]({article['url']}) ({article['source']}, {datetime.fromtimestamp(article['datetime']).strftime('%b %d')})\n"
                         if article.get('summary'):
                             news_context += f"  {article['summary'][:200]}...\n"
@@ -176,6 +176,7 @@ async def stock_history(ticker: str, timeframe: str = "1m"):
         "1m": ("1mo", "1d"),
         "3m": ("3mo", "1d"),
         "1y": ("1y", "1wk"),
+        "5y": ("5y", "1mo"),
     }
     period, interval = timeframe_map.get(timeframe, ("1mo", "1d"))
 
@@ -214,7 +215,7 @@ async def get_portfolio_news(tickers: str):
                     "image": a.get("image", ""),
                     "datetime": a.get("datetime", 0),
                 }
-                for a in news[:4]
+                for a in news[:10]
             ]
         except:
             result[ticker.strip()] = []
@@ -248,4 +249,25 @@ async def get_quote(ticker: str):
         "sparkline": sparkline,
         "market_cap": info.get("marketCap", 0),
         "volume": info.get("volume", 0),
+    }
+
+@app.get("/stock/{ticker}/detail")
+async def stock_detail(ticker: str):
+    stock = yf.Ticker(ticker)
+    info = stock.info
+    
+    return {
+        "ticker": ticker,
+        "company": info.get("longName", ticker),
+        "sector": info.get("sector", ""),
+        "industry": info.get("industry", ""),
+        "market_cap": info.get("marketCap", 0),
+        "volume": info.get("volume", 0),
+        "avg_volume": info.get("averageVolume", 0),
+        "pe_ratio": info.get("trailingPE", 0),
+        "eps": info.get("trailingEps", 0),
+        "week_52_high": info.get("fiftyTwoWeekHigh", 0),
+        "week_52_low": info.get("fiftyTwoWeekLow", 0),
+        "dividend_yield": info.get("dividendYield", 0),
+        "description": info.get("longBusinessSummary", ""),
     }

@@ -5,18 +5,23 @@ import { PerformanceChart } from "@/components/dashboard/PerformanceChart";
 import { SectorDonut } from "@/components/dashboard/SectorDonut";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { supabase, type Holding } from "@/lib/supabase";
+import { useSession } from "@/contexts/SessionContext";
 
 export default function Dashboard() {
+  const { session } = useSession();
+  const userId = session?.user?.id;
   const [holdings, setHoldings] = useState<Holding[]>([]);
 
   useEffect(() => {
+    if (!userId) return;
     supabase
       .from("holdings")
       .select("*")
+      .eq("user_id", userId)
       .then(({ data }) => {
         if (data) setHoldings(data as Holding[]);
       });
-  }, []);
+  }, [userId]);
 
   const totalValue = holdings.reduce((sum, h) => sum + h.shares * h.current_price, 0);
   const totalCost = holdings.reduce((sum, h) => sum + h.shares * h.avg_cost, 0);

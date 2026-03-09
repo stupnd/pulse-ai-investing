@@ -5,12 +5,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+import { supabase } from "@/lib/supabase";
+import { useSession } from "@/contexts/SessionContext";
 
 interface Holding {
   id: string;
@@ -27,6 +23,8 @@ interface SearchResult {
 }
 
 export default function Holdings() {
+  const { session } = useSession();
+  const userId = session?.user?.id;
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -42,12 +40,13 @@ export default function Holdings() {
   const [fetchingPrice, setFetchingPrice] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { fetchHoldings(); }, []);
+  useEffect(() => { if (userId) fetchHoldings(); }, [userId]);
 
   const fetchHoldings = async () => {
     const { data, error } = await supabase
       .from("holdings")
       .select("*")
+      .eq("user_id", userId)
       .order("created_at", { ascending: true });
     if (!error && data) setHoldings(data);
     setLoading(false);
@@ -95,6 +94,7 @@ export default function Holdings() {
     const { data, error } = await supabase
       .from("holdings")
       .insert({
+        user_id: userId,
         ticker: form.ticker.toUpperCase(),
         company: form.company || form.ticker.toUpperCase(),
         shares: Number(form.shares),

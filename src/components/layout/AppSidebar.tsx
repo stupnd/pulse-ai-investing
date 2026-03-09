@@ -1,7 +1,8 @@
-
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Briefcase, MessageSquare, TrendingUp, Newspaper, Bookmark } from "lucide-react";
+import { LayoutDashboard, Briefcase, MessageSquare, TrendingUp, Newspaper, Bookmark, LogOut } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useSession } from "@/contexts/SessionContext";
 
 const navItems = [
   { title: "Dashboard", path: "/", icon: LayoutDashboard },
@@ -12,6 +13,14 @@ const navItems = [
 ];
 
 export function AppSidebar() {
+  const { session } = useSession();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/login");
+  };
+
   return (
     <aside className="w-64 min-h-screen bg-sidebar flex flex-col p-5 shrink-0">
       {/* Logo */}
@@ -45,8 +54,17 @@ export function AppSidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="px-2 py-3 border-t border-sidebar-border">
-        <p className="text-xs text-sidebar-muted">Sage v1.0</p>
+      <div className="px-2 pt-3 border-t border-sidebar-border flex flex-col gap-2">
+        {session?.user?.email && (
+          <p className="text-xs text-sidebar-muted truncate">{session.user.email}</p>
+        )}
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-2.5 text-sm font-medium text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent/50 px-1 py-1.5 rounded-lg transition-colors w-full"
+        >
+          <LogOut className="w-4 h-4" />
+          Log out
+        </button>
       </div>
     </aside>
   );

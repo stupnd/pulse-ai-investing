@@ -3,6 +3,7 @@ import { Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { useSearchParams } from "react-router-dom";
 
 interface Message {
   id: string;
@@ -86,6 +87,17 @@ export default function Chat() {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const ticker = searchParams.get("ticker");
+    const article = searchParams.get("article");
+    if (ticker && article) {
+      setInput(`What do you think about this news for $${ticker}: "${decodeURIComponent(article)}"?`);
+    } else if (ticker) {
+      setInput(`What's your take on $${ticker} right now?`);
+    }
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });

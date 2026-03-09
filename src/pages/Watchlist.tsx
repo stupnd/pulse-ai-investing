@@ -1,13 +1,9 @@
 import { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
 import { Search, Pin, Trash2, TrendingUp, TrendingDown, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+import { supabase } from "@/lib/supabase";
+import { useSession } from "@/contexts/SessionContext";
 
 interface Quote {
   ticker: string;
@@ -25,6 +21,8 @@ interface WatchlistItem {
 }
 
 export default function Watchlist() {
+  const { session } = useSession();
+  const userId = session?.user?.id;
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<{ ticker: string; company: string }[]>([]);
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
@@ -33,11 +31,15 @@ export default function Watchlist() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchWatchlist();
-  }, []);
+    if (userId) fetchWatchlist();
+  }, [userId]);
 
   const fetchWatchlist = async () => {
-    const { data } = await supabase.from("watchlist").select("*").order("created_at");
+    const { data } = await supabase
+      .from("watchlist")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at");
     if (data) {
       setWatchlist(data);
       data.forEach((item) => fetchQuote(item.ticker));
@@ -69,7 +71,7 @@ export default function Watchlist() {
     if (already) return;
     const { data, error } = await supabase
       .from("watchlist")
-      .insert({ ticker, company })
+      .insert({ user_id: userId, ticker, company })
       .select()
       .single();
     if (!error && data) {
@@ -135,7 +137,7 @@ export default function Watchlist() {
             const sparkData = (quote?.sparkline ?? []).map((c) => ({ c }));
 
             return (
-              <div key={item.id} className="bg-card border rounded-xl p-4 flex flex-col gap-3">
+              <div key={item.id} className="bg-card border rounded-xl p-4 flex flex-col gap-3 cursor-pointer" onClick={() => navigate(`/stock/${item.ticker}`)}>
                 {/* Header */}
                 <div className="flex items-start justify-between">
                   <div>
@@ -143,7 +145,7 @@ export default function Watchlist() {
                     <p className="text-xs text-muted-foreground truncate max-w-[160px]">{item.company}</p>
                   </div>
                   <button
-                    onClick={() => removeTicker(item.id, item.ticker)}
+                    onClick={(e) => { e.stopPropagation(); removeTicker(item.id, item.ticker); }}
                     className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -184,7 +186,7 @@ export default function Watchlist() {
 
                     {/* Ask Sage button */}
                     <button
-                      onClick={() => navigate(`/chat?ticker=${item.ticker}`)}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/chat?ticker=${item.ticker}`); }}
                       className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground border rounded-lg px-3 py-2 hover:bg-muted transition-colors w-full"
                     >
                       <MessageSquare className="w-3.5 h-3.5" />

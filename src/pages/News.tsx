@@ -1,11 +1,8 @@
 import { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
-import { ExternalLink } from "lucide-react";
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+import { ExternalLink, MessageSquare } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
+import { useSession } from "@/contexts/SessionContext";
 
 interface Article {
   headline: string;
@@ -21,16 +18,19 @@ interface NewsFeed {
 }
 
 export default function News() {
+  const { session } = useSession();
+  const userId = session?.user?.id;
   const [news, setNews] = useState<NewsFeed>({});
   const [loading, setLoading] = useState(true);
   const [activeTicker, setActiveTicker] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    fetchNews();
-  }, []);
+    if (userId) fetchNews();
+  }, [userId]);
 
   const fetchNews = async () => {
-    const { data } = await supabase.from("holdings").select("ticker");
+    const { data } = await supabase.from("holdings").select("ticker").eq("user_id", userId);
     if (!data || data.length === 0) { setLoading(false); return; }
     const tickers = data.map((h) => h.ticker).join(",");
     const res = await fetch(`http://localhost:8000/news?tickers=${tickers}`);
@@ -111,6 +111,18 @@ export default function News() {
                             month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
                           })}
                         </span>
+                      </div>
+                      <div className="mt-3 pt-3 border-t flex items-center justify-between">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/chat?ticker=${activeTicker}&article=${encodeURIComponent(article.headline)}`);
+                          }}
+                          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          Ask Sage about this
+                        </button>
                       </div>
                     </div>
                   </div>
