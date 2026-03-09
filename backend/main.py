@@ -58,12 +58,43 @@ Rules:
 - When your response discusses price performance, historical trends, or compares stocks over time, you MUST include a chart tag in your response
 - Chart tag format: [CHART:TICKER:TIMEFRAME] where TIMEFRAME is 1d, 7d, 1m, 3m, 1y
 - Example: [CHART:NVDA:1y] or [CHART:AAPL:3m]
+- When asked about recent news, current prices, or market events, use the web search tool to find real current information before answering
+- Always cite your sources when you use search results
 - Place the chart tag on its own line where it makes sense in the response
 - Only include a chart when it genuinely adds value, not on every message""")
 
 async def stream_response(request: ChatRequest):
     system = build_system_prompt(request.holdings)
     
+    # Extract tickers mentioned in the message
+    holding_tickers = [h.ticker for h in request.holdings]
+    mentioned = [t for t in holding_tickers if t.lower() in request.message.lower()]
+    
+    # Fetch real news for mentioned tickers
+    news_context = ""
+    if mentioned:
+        try:
+            import time
+            for ticker in mentioned[:2]:
+                news = finnhub_client.company_news(
+                    ticker,
+                    _from=(datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d"),
+                    to=datetime.now().strftime("%Y-%m-%d")
+                )
+                if news:
+                    news_context += f"\nRecent news for {ticker}:\n"
+                    for article in news[:4]:
+                        news_context += f"- [{article['headline']}]({article['url']}) ({article['source']}, {datetime.fromtimestamp(article['datetime']).strftime('%b %d')})\n"
+                        if article.get('summary'):
+                            news_context += f"  {article['summary'][:200]}...\n"
+        except Exception as e:
+            print(f"News fetch error: {e}")
+
+    # Inject news into system prompt if we found any
+    full_system = system
+    if news_context:
+        full_system += f"\n\nLIVE NEWS CONTEXT (use this to answer, cite the headlines and sources):\n{news_context}"
+
     messages = request.chat_history + [
         {"role": "user", "content": request.message}
     ]
@@ -71,12 +102,11 @@ async def stream_response(request: ChatRequest):
     with client.messages.stream(
         model="claude-sonnet-4-20250514",
         max_tokens=1024,
-        system=system,
+        system=full_system,
         messages=messages,
     ) as stream:
         for text in stream.text_stream:
             yield text
-
 @app.post("/chat")
 async def chat(request: ChatRequest):
     return StreamingResponse(
@@ -161,3 +191,32 @@ async def stock_history(ticker: str, timeframe: str = "1m"):
     ]
 
     return {"ticker": ticker, "timeframe": timeframe, "data": data}
+
+
+@app.get("/news")
+async def get_portfolio_news(tickers: str):
+    ticker_list = tickers.split(",")
+    result = {}
+    
+    for ticker in ticker_list:
+        try:
+            news = finnhub_client.company_news(
+                ticker.strip(),
+                _from=(datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d"),
+                to=datetime.now().strftime("%Y-%m-%d")
+            )
+            result[ticker.strip()] = [
+                {
+                    "headline": a["headline"],
+                    "summary": a.get("summary", ""),
+                    "source": a.get("source", ""),
+                    "url": a.get("url", ""),
+                    "image": a.get("image", ""),
+                    "datetime": a.get("datetime", 0),
+                }
+                for a in news[:4]
+            ]
+        except:
+            result[ticker.strip()] = []
+    
+    return result
